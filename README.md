@@ -10,71 +10,33 @@ ASE-Lab. 5周年プロジェクト「Reboot」の学習プラットフォーム 
   本番 https://ase-lab.space へ外部リンクします。
 
 > ソースの正は `~/ase-lab-reboot/site/`。本リポジトリはそこから Campus 部分だけを取り出した公開用コピーです
-> （本体LPの `home.html`・`about.html` は含みません）。編集はソース側で行い、本リポジトリへ同期してください。
+> （本体LPの `home.html`・`about.html`、および実スライド教材を持つコースは含みません）。
+> 編集はソース側で行い、本リポジトリへは **必ず `node tools/export-campus.mjs` を通して**同期してください。
+> 保守運用・公開手順の詳細は **[MAINTENANCE.md](MAINTENANCE.md)** を参照してください。
 
 ---
 
-## GitHub Pages で公開する手順
+## 公開状態
 
-> 前提: 本番リポジトリ `ase-lab-space/ase-lab` とは**別の新規リポジトリ** `ase-lab-space/ase-lab-campus` に公開します。
-> このディレクトリは既に `git` 初期化・初回コミット済みです（`git log` で確認可）。
-
-### 方法A: GitHub Web UI + git（`gh` 不要・推奨）
-
-1. ブラウザで **https://github.com/organizations/ase-lab-space/repositories/new** を開く
-   （または org トップ → New repository）。
-   - Repository name: `ase-lab-campus`
-   - Visibility: **Public**（GitHub Pages を無料で使う場合。Private + Pages は Team/Enterprise プランが必要）
-   - **README/.gitignore/ライセンスは追加しない**（空リポジトリで作成）
-2. 作成後に表示される URL を remote に登録して push（このディレクトリで実行）:
-   ```bash
-   cd ~/ase-lab-campus
-   git branch -M main
-   git remote add origin https://github.com/ase-lab-space/ase-lab-campus.git
-   git push -u origin main
-   ```
-3. リポジトリの **Settings → Pages** を開く:
-   - Build and deployment → Source: **Deploy from a branch**
-   - Branch: **main** / フォルダ: **/ (root)** → **Save**
-4. 数十秒〜数分後、次の URL で公開されます（ステークホルダーにはこの URL を共有）:
-   **https://ase-lab-space.github.io/ase-lab-campus/**
-
-### 方法B: GitHub CLI（`gh`）を使う場合
-
-`gh` 未インストールなら先に導入し `gh auth login`（org へのアクセス権が必要）:
-```bash
-# Debian/Ubuntu(WSL) 例
-sudo apt update && sudo apt install gh    # もしくは https://github.com/cli/cli の手順
-gh auth login
-```
-その後、このディレクトリから一括で作成・push・Pages 有効化:
-```bash
-cd ~/ase-lab-campus
-gh repo create ase-lab-space/ase-lab-campus --public --source=. --remote=origin --push
-gh api -X POST repos/ase-lab-space/ase-lab-campus/pages \
-  -f "source[branch]=main" -f "source[path]=/"
-```
-公開 URL: **https://ase-lab-space.github.io/ase-lab-campus/**
-
----
+- リポジトリ `ase-lab-space/ase-lab-campus`（Public）で GitHub Pages 公開済み
+- 公開URL: **https://ase-lab-space.github.io/ase-lab-campus/**
+- リポジトリの再作成手順・独自ドメイン設定・公式公開に向けた論点は
+  **[MAINTENANCE.md](MAINTENANCE.md)** にまとめています
 
 ## 更新の反映
 
-ソース（`~/ase-lab-reboot/site/`）を編集したら、Campus 部分を本リポジトリへ同期して push:
+ソース（`~/ase-lab-reboot/site/`）を編集したら、以下のスクリプトで本リポジトリへ同期します
+（**素の `rsync`/`cp` で直接同期しないこと** — 実スライド教材を持つコースを自動除外する
+ロジックを経由しなくなります。詳細は [MAINTENANCE.md](MAINTENANCE.md) 参照）:
 ```bash
-# 例: home.html/about.html を除いて同期（rsync がなければ cp で該当ファイルをコピー）
-rsync -a --exclude home.html --exclude about.html \
-  ~/ase-lab-reboot/site/ ~/ase-lab-campus/
+cd ~/ase-lab-reboot
+node tools/export-campus.mjs
 cd ~/ase-lab-campus && git add -A && git commit -m "update campus" && git push
 ```
 push すると GitHub Pages が自動で再デプロイします。
 
-## （任意）独自ドメイン `campus.ase-lab.space`
-1. このディレクトリに `CNAME` ファイルを追加し、中身を `campus.ase-lab.space` にする → commit & push
-2. DNS で `campus` の CNAME を `ase-lab-space.github.io` に向ける
-3. Settings → Pages → Custom domain に `campus.ase-lab.space` を設定（Enforce HTTPS を有効化）
-
 ## 秘匿性について
-GitHub Pages（Public リポジトリ）は **URL を知る誰でも閲覧可能** です。限定共有したい場合は
+GitHub Pages（Public リポジトリ）は **URL を知る誰でも閲覧・clone可能** です。限定共有したい場合は
 (a) Private リポジトリ + Pages（GitHub Team/Enterprise が必要）、(b) 公開 URL を限定的に共有、
-のいずれかを検討してください。構想資料の PDF 等は本リポジトリには含めていません。
+のいずれかを検討してください。実スライド教材（deck付きコース）は `tools/export-campus.mjs` により
+自動的に本リポジトリから除外されます（経緯は [MAINTENANCE.md](MAINTENANCE.md) 参照）。
