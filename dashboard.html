@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>アカウント | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.dash-grid { display: grid; grid-template-columns: 1fr 320px; gap: 26px; align-items: start; margin-top: 8px; }
+@media (max-width: 1000px) { .dash-grid { grid-template-columns: 1fr; } }
+.side-stack { display: grid; gap: 20px; }
+.tool-row { display: flex; gap: 10px; flex-wrap: wrap; }
+/* 前回の続き (Progateの "前回の続き" レッスンカード踏襲) */
+.next-lesson { display: flex; background: #fff; border-radius: 12px; box-shadow: var(--shadow-card); overflow: hidden; }
+.next-lesson .nl-media { width: 300px; flex: none; position: relative; }
+.next-lesson .nl-media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.next-lesson .nl-body { flex: 1; padding: 18px 24px; min-width: 240px; }
+.next-lesson .nl-step { font-size: .74rem; font-weight: 700; letter-spacing: 1px; color: var(--primary); text-transform: uppercase; }
+.next-lesson h3 { font-size: 1.15rem; margin: 3px 0 8px; }
+.next-lesson .nl-progress-row { display: flex; align-items: center; gap: 10px; margin: 8px 0 14px; }
+.next-lesson .nl-progress-row .progress-bar { flex: 1; max-width: 300px; }
+.next-lesson .nl-progress-row span { font-size: .78rem; color: var(--muted); }
+.next-lesson .nl-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+@media (max-width: 800px) { .next-lesson { flex-direction: column; } .next-lesson .nl-media { width: 100%; aspect-ratio: 16/9; } }
+
+/* 設定トグル(スライダー) */
+.setting-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.setting-row .lbl { font-size: .86rem; font-weight: 600; }
+.setting-row .lbl .sub { font-size: .72rem; color: var(--muted); font-weight: 400; margin-top: 3px; }
+.switch { position: relative; display: inline-block; width: 46px; height: 26px; flex: none; margin-top: 2px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch .track { position: absolute; inset: 0; background: #cfcfcf; border-radius: 999px; transition: background .2s; cursor: pointer; }
+.switch .track::before { content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.3); }
+.switch input:checked + .track { background: var(--accent, var(--primary)); }
+.switch input:checked + .track::before { transform: translateX(20px); }
+.switch input:focus-visible + .track { outline: 2px solid var(--primary); outline-offset: 2px; }
+.privacy-status { font-size: .74rem; margin-top: 10px; padding: 7px 10px; border-radius: 7px; }
+.privacy-status.on { background: var(--primary-soft); color: var(--primary); }
+.privacy-status.off { background: #f3f3f3; color: var(--muted); }
+</style>
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+    <div id="dash-root"></div>
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "dashboard", title: "アカウント" });
+if (requireLogin()) renderDashboard();
+
+function nextDateOf(scheduleText) {
+  // "毎週月 21:00" / "隔週日 20:00" から次回日付(M月D日)を推定するモック実装
+  const m = scheduleText.match(/[月火水木金土日]/);
+  if (!m) return null;
+  const target = "日月火水木金土".indexOf(m[0]);
+  const d = new Date();
+  do { d.setDate(d.getDate() + 1); } while (d.getDay() !== target);
+  return `${d.getMonth() + 1}月${d.getDate()}日`;
+}
+
+function renderDashboard() {
+  const weeks = streakWeeks(user);
+  const flames = flameCount(weeks);
+  const joined = user.seminars.map(id => SEMINARS.find(s => s.id === id)).filter(Boolean);
+  const pastel = ["var(--pastel-blue)", "var(--pastel-pink)", "var(--pastel-green)", "var(--pastel-orange)"];
+  const pieColor = ["#5f9bd9", "#d963b8", "#6dbf50", "#e8944a"];
+
+  // スケジュール(直近2件)
+  const sched = joined
+    .map(s => ({ s, date: nextDateOf(s.schedule) }))
+    .filter(x => x.date).slice(0, 2)
+    .map(x => `<div><span class="date">${x.date}</span><br>#${String(x.s.id).padStart(2, "0")}-${esc(x.s.name)}</div>`)
+    .join("");
+
+  // 学習中のゼミ(パステル+円グラフ、構想PDF準拠)
+  const studyCards = joined.map((s, i) => {
+    const pct = 30 + ((s.id * 37) % 60);
+    return `<a class="study-card" href="seminars.html">
+      <div class="visual" style="background:${pastel[i % 4]}">
+        <span class="num">#${String(s.id).padStart(2, "0")}</span>
+        ${donutSVG(pct, pieColor[i % 4], 44)}
+      </div>
+      <div class="body"><div class="t">${esc(s.name)}</div><div class="s">進捗 ${pct}% ・ ${esc(s.schedule)}</div></div>
+    </a>`;
+  }).join("");
+
+  // 開催中のゼミ(未参加のもの)
+  const openSeminars = SEMINARS.filter(s => s.status === "進行中" && !user.seminars.includes(s.id))
+    .slice(0, 4).map(s => seminarCardHTML(s)).join("");
+
+  // 学習中のコース
+  const started = COURSES.filter(c => user.progress[c.id] && user.progress[c.id].done.some(Boolean));
+  const courseRows = started.length ? started.map(c => {
+    const pr = courseProgress(c);
+    return `<a href="course.html?id=${c.id}" style="text-decoration:none;color:inherit;display:flex;gap:12px;align-items:center;padding:10px 4px;border-bottom:1px solid #f3f3f3">
+      <img src="img/covers/${encodeURIComponent(c.id)}.jpg" alt="" loading="lazy" style="width:76px;aspect-ratio:16/9;object-fit:cover;border-radius:7px;flex:none">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.88rem;font-weight:700">${esc(c.title)}</div>
+        <div class="progress-bar" style="margin-top:5px"><i style="width:${pr.pct}%"></i></div>
+      </div>
+      <span style="font-size:.8rem;color:${pr.completed ? "var(--c-green)" : "var(--muted)"};font-weight:700">${pr.completed ? "修了" : pr.pct + "%"}</span>
+    </a>`;
+  }).join("") : `<p style="color:var(--muted);font-size:.85rem">まだ教材を開始していません。<a href="courses.html">コース一覧</a>からはじめましょう。</p>`;
+
+  // メッセージ(構想PDF準拠: Slackチャンネル風)
+  const channels = [
+    { label: "#01-お知らせ", unread: true },
+    ...joined.map((s, i) => ({ label: `#${String(s.id).padStart(2, "0")}-${s.name}`, unread: i < 2 })),
+    ...SEMINARS.filter(s => s.status === "進行中" && !user.seminars.includes(s.id)).slice(0, 4)
+      .map(s => ({ label: `#${String(s.id).padStart(2, "0")}-${s.name}`, unread: false })),
+  ];
+  const msgList = channels.map(ch =>
+    `<li class="${ch.unread ? "unread" : ""}">${esc(ch.label)}${ch.unread ? '<span class="dot"></span>' : ""}</li>`
+  ).join("");
+
+  // バッジ
+  const badgeGrid = BADGES.map(b => `<div class="badge-item ${user.badges.includes(b.id) ? "" : "locked"}">
+    <span class="bi">${b.icon}</span><div><div class="bn">${b.name}</div><div class="bd">${b.desc}</div></div></div>`).join("");
+
+  // 前回の続き: 進行中(未修了)のコースの先頭を再開できるヒーローカード
+  const inProgress = started.filter(c => !user.progress[c.id].completed);
+  const cont = inProgress[0];
+  let nextLessonHTML = "";
+  if (cont) {
+    const p = user.progress[cont.id];
+    const doneCount = p.done.filter(Boolean).length;
+    const total = courseSteps(cont);
+    const pr = courseProgress(cont);
+    nextLessonHTML = `
+      <div class="panel-label">前回の続き</div>
+      <div class="next-lesson">
+        <div class="nl-media"><img src="img/covers/${encodeURIComponent(cont.id)}.jpg" alt=""></div>
+        <div class="nl-body">
+          <div class="nl-step">${esc(cont.titleEn)}</div>
+          <h3>${esc(cont.title)}</h3>
+          <div style="font-size:.85rem;color:var(--muted)">${esc(cont.deckTitle || cont.sampleLessonTitle)}</div>
+          <div class="nl-progress-row">
+            <div class="progress-bar"><i style="width:${pr.pct}%"></i></div>
+            <span>${doneCount} / ${total} ステップ</span>
+          </div>
+          <div class="nl-actions">
+            <a class="border-button sm" href="course.html?id=${encodeURIComponent(cont.id)}">コース詳細へ</a>
+            <a class="border-button sm primary" href="lesson.html?id=${encodeURIComponent(cont.id)}">続きからはじめる</a>
+          </div>
+        </div>
+      </div>`;
+  } else {
+    nextLessonHTML = `
+      <div class="panel-label">前回の続き</div>
+      <div class="card" style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <p style="margin:0;flex:1;font-size:.9rem">学習中のコースはありません。新しいコースをはじめましょう。</p>
+        <a class="border-button sm primary" href="courses.html">コースを探す</a>
+      </div>`;
+  }
+
+  document.getElementById("dash-root").innerHTML = `
+    <div class="panel-label">あなたのスキル</div>
+    <div class="skill-card">
+      <div class="cell profile">
+        ${avatarHTML(user, "avatar-l")}
+        <div>
+          <div class="p-name">${esc(user.name)}</div>
+          <div class="p-handle">${esc(user.handle || "")} ・ ${esc(user.role)}</div>
+          <div class="flames" title="連続学習 ${weeks}週">${[0, 1, 2].map(i => `<span class="${i < flames ? "" : "off"}">🔥</span>`).join("")}</div>
+        </div>
+      </div>
+      <div class="cell">
+        <div class="cell-icon">📖</div>
+        <div class="big-num pink">${user.seminarsTaken}</div>
+        <div class="cell-label">履修ゼミ数</div>
+      </div>
+      <div class="cell">
+        <div class="cell-icon">🏅</div>
+        <div class="big-num gold">${user.score}</div>
+        <div class="cell-label">SCORE</div>
+      </div>
+      <div class="cell schedule">
+        ${sched || '<span style="color:var(--faint)">予定はありません</span>'}
+        <div class="cell-label" style="margin-top:4px">スケジュール</div>
+      </div>
+    </div>
+
+    ${nextLessonHTML}
+
+    <div class="dash-grid">
+      <div>
+        <div class="panel-label">学習中のゼミ</div>
+        <div class="grid c4" style="gap:14px">${studyCards || '<p style="color:var(--muted);font-size:.85rem">参加中のゼミはありません。</p>'}</div>
+
+        <div class="panel-label">学習中のコース</div>
+        <div class="card">${courseRows}</div>
+
+        <div class="panel-label">開催中のゼミ</div>
+        ${openSeminars}
+        <a class="single-line-link" href="seminars.html">すべてのゼミを見る →</a>
+      </div>
+
+      <div class="side-stack">
+        <div class="message-panel">
+          <div class="mp-head">メッセージ</div>
+          <ul id="msg-list">${msgList}</ul>
+        </div>
+
+        <div class="calendar-panel">
+          <div class="cal-title">学習カレンダー <span style="color:var(--faint);font-weight:400;font-size:.75rem">直近15週</span></div>
+          ${calendarHTML(user, 15)}
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:8px">バッジ <span style="color:var(--faint);font-weight:400;font-size:.78rem">${user.badges.length}/${BADGES.length}</span></div>
+          <div class="badge-grid" style="grid-template-columns:1fr">${badgeGrid}</div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:6px">実績のエクスポート</div>
+          <p style="font-size:.78rem;color:var(--muted);margin:0 0 10px">履修ゼミ・SCORE・バッジをまとめたスコアシートを発行できます。就活・ポートフォリオに。</p>
+          <div class="tool-row">
+            <a class="border-button sm primary" href="scoresheet.html">スコアシートを発行</a>
+            <button class="border-button sm" id="logout-btn">ログアウト</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="font-weight:700;font-size:.95rem;margin-bottom:10px">プライバシー設定</div>
+          <div class="setting-row">
+            <div class="lbl">ランキングへの掲載を希望しない
+              <div class="sub">オンにすると、<a href="members.html">ランキング</a>にあなたのSCORE・記録が表示されなくなります。</div>
+            </div>
+            <label class="switch">
+              <input type="checkbox" id="rank-optout">
+              <span class="track"></span>
+            </label>
+          </div>
+          <div class="privacy-status" id="privacy-status"></div>
+        </div>
+      </div>
+    </div>`;
+
+  const optout = document.getElementById("rank-optout");
+  const pstatus = document.getElementById("privacy-status");
+  function reflectPrivacy() {
+    const off = !!user.hideFromRanking;
+    optout.checked = off;
+    pstatus.className = "privacy-status " + (off ? "on" : "off");
+    pstatus.textContent = off
+      ? "🔒 現在ランキングに掲載されていません（あなたには自分の順位のみ表示されます）"
+      : "👀 現在ランキングに掲載されています";
+  }
+  reflectPrivacy();
+  optout.addEventListener("change", () => {
+    user.hideFromRanking = optout.checked;
+    Store.save(user);
+    reflectPrivacy();
+    toast(optout.checked ? "ランキングに掲載しない設定にしました" : "ランキングに掲載する設定にしました");
+  });
+
+  document.getElementById("msg-list").addEventListener("click", () =>
+    toast("メッセージ機能は本実装で提供予定です(モック)"));
+  document.getElementById("logout-btn").addEventListener("click", () => {
+    if (confirm("ログアウトしますか？(学習データはこのブラウザに残ります)")) {
+      Store.clear(); location.href = "login.html";
+    }
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ログイン | ASE-Lab.</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.login-box h1 { font-size: 1.6rem; margin-bottom: 10px; }
+.login-box .lead { color: var(--muted); font-size: 0.88rem; margin-bottom: 6px; }
+.login-box .divider { text-align: center; color: var(--faint); font-size: 0.8rem; margin: 22px 0; letter-spacing: 2px; }
+.login-box .demo-note { font-size: 0.75rem; color: var(--faint); margin-top: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="login-box">
+      <div class="card">
+        <h1>Campusにログイン</h1>
+        <p class="lead">Campus は、宇宙を学ぶための人・知識・情報が集まる ASE-Lab. の学習プラットフォームです。アカウントを作ると、学習進捗・SCORE・バッジが記録されます。モックのためデータはこのブラウザ内にのみ保存されます。</p>
+        <form id="loginform">
+          <div class="field">
+            <label for="fname">表示名</label>
+            <input id="fname" required maxlength="20" placeholder="例: 星野 いぶき">
+          </div>
+          <div class="field">
+            <label for="fhandle">ハンドル(任意)</label>
+            <input id="fhandle" maxlength="20" placeholder="@your_handle">
+          </div>
+          <div class="field">
+            <label for="frole">立場</label>
+            <select id="frole">
+              <option>大学生</option>
+              <option>高校生</option>
+              <option>大学院生</option>
+              <option>エンジニア(他分野)</option>
+              <option>宇宙業界で働いている</option>
+              <option>事業者・経営者</option>
+              <option>その他</option>
+            </select>
+          </div>
+          <button class="border-button primary" style="width:100%;margin-top:8px" type="submit">はじめる</button>
+        </form>
+        <div class="divider">OR</div>
+        <button class="border-button" style="width:100%" id="demologin">👩‍🚀 デモアカウントで試す(学習履歴つき)</button>
+        <p class="demo-note">※ デモアカウントは、構想資料に登場する Maya Abe(@abema_astro)のデータで始まります。</p>
+      </div>
+    </div>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "", mode: "auth", title: "ログイン" });
+
+if (user) {
+  location.href = "dashboard.html";
+} else {
+  document.getElementById("loginform").addEventListener("submit", e => {
+    e.preventDefault();
+    const name = document.getElementById("fname").value.trim();
+    if (!name) return;
+    let handle = document.getElementById("fhandle").value.trim();
+    if (handle && !handle.startsWith("@")) handle = "@" + handle;
+    const role = document.getElementById("frole").value;
+    user = newUser(name, handle, role);
+    Store.save(user);
+    location.href = "dashboard.html";
+  });
+
+  document.getElementById("demologin").addEventListener("click", () => {
+    user = demoUser();
+    Store.save(user);
+    location.href = "dashboard.html";
+  });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コース | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="page-head">
+      <h1>コース</h1>
+      <p>スライドとクイズで学ぶオンライン教材。各コースの体験版(Lesson 1)を公開中です。</p>
+    </div>
+
+    <div class="filter-row" id="cat-filters"></div>
+    <p style="font-size:.8rem;color:var(--faint)" id="count"></p>
+    <div class="grid c3" id="list"></div>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "courses", title: "コース" });
+
+const state = { cat: "すべて" };
+const CATS = ["すべて", "工学基礎", "システム設計", "データ利用", "ビジネス・政策"];
+
+function filtered() {
+  return COURSES.filter(c => state.cat === "すべて" || c.category === state.cat);
+}
+
+function courseCardHTML(c) {
+  const pr = user ? courseProgress(c) : { pct: 0, started: false, completed: false };
+  return `<a class="course-card" href="course.html?id=${encodeURIComponent(c.id)}">
+    <div class="cc-media">
+      <img src="img/covers/${encodeURIComponent(c.id)}.jpg" alt="${esc(c.title)}のカバー" loading="lazy">
+      ${c.deck ? '<span class="cc-flag">実教材スライド</span>' : ""}
+    </div>
+    <div class="cc-body">
+      <div class="top">
+        <div class="cicon">${esc(c.icon)}</div>
+        <div>
+          <h3>${esc(c.title)}</h3>
+          <div class="en">${esc(c.titleEn)}</div>
+        </div>
+      </div>
+      <p class="desc">${esc(c.description)}</p>
+      <div class="meta">
+        <span class="chip purple">${esc(c.level)}</span>
+        <span class="chip outline">${esc(c.category)}</span>
+        <span class="chip outline">全${c.totalLessons}レッスン予定</span>
+      </div>
+      ${pr.started ? `<div>
+        <div class="progress-bar"><i style="width:${pr.pct}%"></i></div>
+        <div class="progress-meta"><span>${pr.completed ? "体験レッスン修了 🎉" : "学習中"}</span><span>${pr.pct}%</span></div>
+      </div>` : ""}
+    </div>
+  </a>`;
+}
+
+function render() {
+  document.getElementById("cat-filters").innerHTML = CATS.map(c =>
+    `<button class="filter-btn ${state.cat === c ? "on" : ""}" data-cat="${esc(c)}">${esc(c)}</button>`).join(" ");
+  const list = filtered();
+  document.getElementById("count").textContent = `${list.length} / ${COURSES.length} コース`;
+  document.getElementById("list").innerHTML = list.length
+    ? list.map(courseCardHTML).join("")
+    : '<p style="color:var(--muted)">条件に合うコースが見つかりませんでした。</p>';
+}
+render();
+
+document.getElementById("cat-filters").addEventListener("click", e => {
+  const b = e.target.closest("[data-cat]");
+  if (!b) return;
+  state.cat = b.dataset.cat;
+  render();
+});
+</script>
+</body>
+</html>

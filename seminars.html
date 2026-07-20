@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ゼミ一覧 | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="page-head">
+      <h1>ゼミ</h1>
+      <p>実施中のゼミへの参加も、過去のゼミの資料閲覧も。ASE-Lab.の学びのアーカイブです。</p>
+    </div>
+
+    <div class="filter-row">
+      <input class="search-box" id="q" type="search" placeholder="ゼミ名・分野で検索">
+      <span id="status-filters"></span>
+    </div>
+    <div class="filter-row" id="field-filters"></div>
+    <p style="font-size:.8rem;color:var(--faint)" id="count"></p>
+    <div id="list" class="grid c3"></div>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "seminars", title: "ゼミ一覧" });
+
+const state = { status: "すべて", field: "すべて", q: "" };
+const STATUSES = ["すべて", "進行中", "企画中", "終了"];
+const FIELDS = ["すべて", ...new Set(SEMINARS.map(s => s.field))];
+
+function filtered() {
+  return SEMINARS.filter(s =>
+    (state.status === "すべて" || s.status === state.status) &&
+    (state.field === "すべて" || s.field === state.field) &&
+    (!state.q || (s.name + s.description + s.field).toLowerCase().includes(state.q.toLowerCase()))
+  ).sort((a, b) => b.id - a.id);
+}
+
+function render() {
+  document.getElementById("status-filters").innerHTML = STATUSES.map(st =>
+    `<button class="filter-btn ${state.status === st ? "on" : ""}" data-st="${st}">${st}</button>`).join(" ");
+  document.getElementById("field-filters").innerHTML = FIELDS.map(f =>
+    `<button class="filter-btn ${state.field === f ? "on" : ""}" data-f="${f}">${f}</button>`).join(" ");
+  const list = filtered();
+  document.getElementById("count").textContent = `${list.length} / ${SEMINARS.length} ゼミ`;
+  document.getElementById("list").innerHTML = list.length
+    ? list.map(s => {
+        const joined = user && user.seminars.includes(s.id);
+        const detail = `<a class="border-button sm" href="seminar.html?id=${s.id}">詳細を見る</a>`;
+        const action = s.status === "終了"
+          ? `${detail}<a class="border-button sm primary" href="seminar.html?id=${s.id}">資料を見る</a>`
+          : user
+            ? `<button class="border-button sm ${joined ? "" : "primary"}" data-join="${s.id}">${joined ? "参加中 ✓(退出する)" : "参加する"}</button>${detail}`
+            : `${detail}<a class="border-button sm" href="login.html">ログインして参加</a>`;
+        return seminarTileHTML(s, `<div style="display:flex;gap:8px;flex-wrap:wrap">${action}</div>`);
+      }).join("")
+    : '<p style="color:var(--muted)">条件に合うゼミが見つかりませんでした。</p>';
+}
+render();
+
+document.getElementById("q").addEventListener("input", e => { state.q = e.target.value; render(); });
+document.body.addEventListener("click", e => {
+  const st = e.target.closest("[data-st]");
+  if (st) { state.status = st.dataset.st; render(); return; }
+  const f = e.target.closest("[data-f]");
+  if (f) { state.field = f.dataset.f; render(); return; }
+  const j = e.target.closest("[data-join]");
+  if (j) {
+    const id = +j.dataset.join;
+    const i = user.seminars.indexOf(id);
+    if (i >= 0) { user.seminars.splice(i, 1); Store.save(user); toast("ゼミを退出しました"); }
+    else {
+      user.seminars.push(id);
+      user.seminarsTaken += 1;
+      Store.save(user);
+      addScore(10); // 参加ボーナス(トーストは addScore が表示)
+      if (user.seminars.length >= 3) grantBadge("seminar-3");
+    }
+    render(); return;
+  }
+});
+</script>
+</body>
+</html>

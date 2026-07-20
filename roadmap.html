@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ロードマップ | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.track-card { padding: 30px 34px; }
+.track-card h2 { font-size: 1.3rem; margin-bottom: 6px; }
+.track-card .desc { color: var(--muted); font-size: 0.88rem; margin: 0 0 8px; }
+.stage-stagelabel { font-family: var(--font-title); font-weight: 600; letter-spacing: 0.5px; color: var(--faint); font-size: 0.78rem; }
+@media (max-width: 700px) { .track-card { padding: 22px 20px; } }
+</style>
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="page-head">
+      <h1>ロードマップ</h1>
+      <p>目指す姿から逆算した、コースと書籍の推奨ルート。コースで概観をつかみ、書籍で深掘りします。</p>
+    </div>
+
+    <div class="filter-row" id="tabs" style="max-width:880px;margin-left:auto;margin-right:auto;justify-content:center"></div>
+    <div style="max-width:880px;margin:0 auto" id="track"></div>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "roadmap", title: "ロードマップ" });
+
+const bookById = Object.fromEntries(BOOKS.map(b => [b.id, b]));
+const courseById = Object.fromEntries(COURSES.map(c => [c.id, c]));
+let sel = ROADMAPS[0].id;
+
+function render() {
+  const t = ROADMAPS.find(r => r.id === sel) || ROADMAPS[0];
+  document.getElementById("tabs").innerHTML = ROADMAPS.map(r =>
+    `<button class="filter-btn ${r.id === t.id ? "on" : ""}" data-rm="${r.id}">${esc(r.icon)} ${esc(r.title)}</button>`).join(" ");
+  document.getElementById("track").innerHTML = `
+    <div class="card track-card">
+      <h2>${esc(t.icon)} ${esc(t.title)}</h2>
+      <p class="desc">${esc(t.description)}</p>
+      <p style="margin:0 0 26px"><span class="chip outline">対象: ${esc(t.audience)}</span></p>
+      <div class="stage-flow">
+        ${t.stages.map(st => `
+          <div class="stage-item">
+            <div class="rail"><div class="node">${st.stage}</div><div class="cord"></div></div>
+            <div style="flex:1">
+              <div class="stage-stagelabel">STAGE ${st.stage}${st.durationHint ? ` — ${esc(st.durationHint)}` : ""}</div>
+              <h3>${esc(st.title)}</h3>
+              <p class="goal">🏁 ${esc(st.goal)}</p>
+              <div class="resource-list">
+                ${(st.courseIds || []).map(id => {
+                  const c = courseById[id];
+                  return c ? `<a class="r" href="course.html?id=${encodeURIComponent(c.id)}">
+                    <img class="r-thumb" src="img/covers/${encodeURIComponent(c.id)}.jpg" alt="" loading="lazy">
+                    <span class="tag c">COURSE</span>
+                    <span style="flex:1">${esc(c.title)}</span>
+                    <span class="chip purple">${esc(c.level)}</span>
+                  </a>` : "";
+                }).join("")}
+                ${(st.bookIds || []).map(id => {
+                  const b = bookById[id];
+                  if (!b) return "";
+                  const thumb = b.cover
+                    ? `<img class="r-bookthumb" src="${esc(b.cover)}" alt="" loading="lazy" onerror="this.outerHTML='<span class=\\'r-bookthumb lvl-bg-${b.level}\\'>L${b.level}</span>'">`
+                    : `<span class="r-bookthumb lvl-bg-${b.level}">L${b.level}</span>`;
+                  return `<div class="r">
+                    ${thumb}
+                    <span class="tag b">BOOK</span>
+                    <span style="flex:1">${esc(b.title)} <span style="color:var(--muted)">— ${esc(b.author)}</span></span>
+                    <span class="lvl l${b.level}">L${b.level}</span>
+                  </div>`;
+                }).join("")}
+              </div>
+            </div>
+          </div>`).join("")}
+      </div>
+    </div>`;
+}
+render();
+
+document.getElementById("tabs").addEventListener("click", e => {
+  const b = e.target.closest("[data-rm]");
+  if (!b) return;
+  sel = b.dataset.rm;
+  render();
+});
+</script>
+</body>
+</html>

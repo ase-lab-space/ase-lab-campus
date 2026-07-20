@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>スコアシート | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.sheet-tools { max-width: 800px; margin: 0 auto 14px; display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
+.sheet {
+  max-width: 800px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: var(--shadow-card);
+  padding: 44px 48px;
+  position: relative;
+  overflow: hidden;
+}
+.sheet::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 8px;
+  background: linear-gradient(90deg, var(--accent), var(--secondary));
+}
+.sheet-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+.sheet-brand { display: flex; align-items: center; gap: 10px; }
+.sheet-brand img { width: 38px; height: 38px; }
+.sheet-brand .logo-word { font-size: 2rem; color: var(--ink-title); }
+.sheet-title { text-align: right; }
+.sheet-title .en { font-family: var(--font-title); font-weight: 800; font-size: 1.05rem; letter-spacing: 3px; color: var(--primary); }
+.sheet-title .ja { font-size: 0.75rem; color: var(--muted); }
+.sheet-user { display: flex; align-items: center; gap: 18px; margin: 26px 0 6px; }
+.sheet-user img.avatar-l, .sheet-user .avatar-l { width: 64px; height: 64px; font-size: 1.5rem; }
+.sheet-user .su-name { font-size: 1.4rem; font-weight: 800; color: var(--ink-title); line-height: 1.3; }
+.sheet-user .su-sub { font-size: 0.82rem; color: var(--muted); }
+.sheet-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0 4px; }
+@media (max-width: 640px) { .sheet-stats { grid-template-columns: repeat(2, 1fr); } }
+.sheet-stats .st {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  text-align: center;
+  padding: 12px 6px 10px;
+}
+.sheet-stats .n { font-family: var(--font-title); font-weight: 800; font-size: 1.6rem; color: var(--primary); line-height: 1.1; }
+.sheet-stats .l { font-size: 0.7rem; color: var(--muted); font-weight: 700; }
+.sheet h2 { font-size: 0.95rem; margin: 24px 0 10px; padding-left: 10px; border-left: 4px solid var(--accent); }
+.sheet .srow { display: flex; align-items: center; gap: 10px; padding: 7px 2px; border-bottom: 1px dashed var(--line); font-size: 0.85rem; }
+.sheet .srow:last-child { border-bottom: none; }
+.sheet .srow .grow { flex: 1; min-width: 0; }
+.sheet .srow .pct { font-weight: 700; color: var(--primary); font-size: 0.8rem; flex: none; }
+.sheet .srow .progress-bar { width: 130px; flex: none; }
+.badge-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.badge-row .b { border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; font-size: 0.78rem; }
+.sem-chip-row { display: flex; gap: 6px; flex-wrap: wrap; }
+.sem-chip-row .chip { font-size: 0.72rem; }
+.sheet-foot { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); flex-wrap: wrap; }
+.sheet-foot .issue { font-size: 0.74rem; color: var(--muted); }
+.sheet-foot .sid { font-family: monospace; font-size: 0.72rem; color: var(--faint); }
+.sheet-note { max-width: 800px; margin: 12px auto 0; font-size: 0.72rem; color: var(--faint); }
+
+/* 印刷: シートのみをA4・1ページに出力 */
+@page { size: A4 portrait; margin: 10mm; }
+@media print {
+  html, body.campus-theme { background: #fff; margin: 0; padding: 0; height: auto; }
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  #app-header, #app-footer, .sheet-tools, .sheet-note, .ctheme-picker, .footer-hr, .site-footer, .toast { display: none !important; }
+  .frame-container, .frame-container-top { padding: 0 !important; margin: 0 !important; max-width: none !important; background: none !important; box-shadow: none !important; }
+  .layout-background { display: none !important; }
+  .sheet {
+    box-shadow: none; border-radius: 0; max-width: none; margin: 0;
+    padding: 6mm 8mm;
+    page-break-inside: avoid; break-inside: avoid;
+  }
+  /* fitToPage() が height 超過時に zoom を差し込み、1ページに収める */
+}
+</style>
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="page-head">
+      <h1>スコアシート</h1>
+      <p>あなたの学習実績を1枚にまとめて発行できます。就活・ポートフォリオ用途を想定しています。</p>
+    </div>
+
+    <div class="sheet-tools">
+      <a class="border-button sm" href="dashboard.html">← ダッシュボードへ</a>
+      <button class="border-button sm primary" id="pdf-btn">📄 PDFで発行（A4・1枚）</button>
+    </div>
+
+    <div class="sheet" id="sheet"></div>
+    <p class="sheet-note">※ 「PDFで発行」を押すと印刷ダイアログが開きます。出力先で「PDFに保存」を選ぶと、A4・1枚のスコアシートPDFとして保存できます。<br>※ モックのため内容はこのブラウザの学習記録に基づきます。本実装では改ざん検証用の発行IDとオンライン照会URLを付与する想定です。</p>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "dashboard", title: "スコアシート" });
+if (requireLogin()) renderSheet();
+
+/* A4・1枚に確実に収める: 印刷直前にシート高さを測り、はみ出す分だけ zoom で縮小する。
+   A4 縦(297mm) から上下マージン(各10mm)を引いた印刷可能高さ ≒ 277mm を 96dpi 換算した px。 */
+const PAGE_H_PX = Math.round((297 - 20) * 96 / 25.4); // ≒ 1047px
+function fitToPage() {
+  const sheet = document.getElementById("sheet");
+  if (!sheet) return;
+  sheet.style.zoom = "";
+  const h = sheet.scrollHeight;
+  if (h > PAGE_H_PX) sheet.style.zoom = (PAGE_H_PX / h).toFixed(3);
+}
+function resetFit() {
+  const sheet = document.getElementById("sheet");
+  if (sheet) sheet.style.zoom = "";
+}
+window.addEventListener("beforeprint", fitToPage);
+window.addEventListener("afterprint", resetFit);
+document.getElementById("pdf-btn").addEventListener("click", () => {
+  fitToPage();
+  window.print();
+});
+
+function issueId() {
+  // 発行ID(モック): 名前+発行日から決定的に生成
+  const src = `${user.name}|${user.handle}|${new Date().toISOString().slice(0, 10)}`;
+  let h = 2166136261;
+  for (const ch of src) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); }
+  return "ASE-" + (h >>> 0).toString(16).toUpperCase().padStart(8, "0");
+}
+
+function renderSheet() {
+  const weeks = streakWeeks(user);
+  const joined = user.seminars.map(id => SEMINARS.find(s => s.id === id)).filter(Boolean);
+  const started = COURSES.filter(c => user.progress[c.id] && user.progress[c.id].done.some(Boolean));
+  const badges = user.badges.map(id => BADGES.find(b => b.id === id)).filter(Boolean);
+  const today = new Date();
+  const z = n => String(n).padStart(2, "0");
+  const issued = `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`;
+
+  const courseRows = started.length ? started.map(c => {
+    const pr = courseProgress(c);
+    return `<div class="srow">
+      <div class="grow">${esc(c.title)} <span style="color:var(--faint);font-size:.75rem">${esc(c.titleEn)}</span></div>
+      <div class="progress-bar"><i style="width:${pr.pct}%"></i></div>
+      <span class="pct">${pr.completed ? "修了" : pr.pct + "%"}</span>
+    </div>`;
+  }).join("") : '<div class="srow"><span style="color:var(--faint)">学習中のコースはまだありません</span></div>';
+
+  document.getElementById("sheet").innerHTML = `
+    <div class="sheet-head">
+      <div class="sheet-brand">
+        <img src="img/logo.webp" alt="ASE-Lab.">
+        <span class="logo-word">ASE-Lab.</span>
+        <span class="reboot-mark">CAMPUS</span>
+      </div>
+      <div class="sheet-title">
+        <div class="en">SCORE SHEET</div>
+        <div class="ja">学習実績レポート</div>
+      </div>
+    </div>
+
+    <div class="sheet-user">
+      ${avatarHTML(user, "avatar-l")}
+      <div>
+        <div class="su-name">${esc(user.name)}</div>
+        <div class="su-sub">${esc(user.handle || "")} ・ ${esc(user.role)} ・ ${esc(user.joinedAt)} 参加</div>
+      </div>
+    </div>
+
+    <div class="sheet-stats">
+      <div class="st"><div class="n">${user.score}</div><div class="l">SCORE</div></div>
+      <div class="st"><div class="n">${user.seminarsTaken}</div><div class="l">履修ゼミ数</div></div>
+      <div class="st"><div class="n">${weeks}<small style="font-size:.8rem">週</small></div><div class="l">連続学習</div></div>
+      <div class="st"><div class="n">${badges.length}<small style="font-size:.8rem">/${BADGES.length}</small></div><div class="l">獲得バッジ</div></div>
+    </div>
+
+    <h2>教材コースの進捗</h2>
+    ${courseRows}
+
+    <h2>参加中のゼミ</h2>
+    <div class="sem-chip-row">
+      ${joined.length ? joined.map(s => `<span class="chip outline">#${String(s.id).padStart(2, "0")} ${esc(s.name)}</span>`).join("") : '<span style="color:var(--faint);font-size:.85rem">参加中のゼミはありません</span>'}
+    </div>
+
+    <h2>獲得バッジ</h2>
+    <div class="badge-row">
+      ${badges.length ? badges.map(b => `<span class="b">${b.icon} ${esc(b.name)}</span>`).join("") : '<span style="color:var(--faint);font-size:.85rem">まだバッジがありません</span>'}
+    </div>
+
+    <div class="sheet-foot">
+      <div class="issue">発行日: ${issued}<br>発行者: ASE-Lab. Campus（学習プラットフォーム）</div>
+      <div class="sid">発行ID: ${issueId()}</div>
+    </div>`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>レッスン | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.donebox { text-align: center; padding: 56px 40px; }
+.donebox .big { font-size: 3.4rem; line-height: 1; }
+.donebox h2 { font-size: 1.3rem; margin: 14px 0 6px; }
+.donebox .muted { color: var(--muted); font-size: .9rem; }
+.gained { display: flex; justify-content: center; gap: 32px; margin: 26px 0 6px; flex-wrap: wrap; }
+.gained .g { text-align: center; }
+.gained .g .n { font-family: var(--font-title); font-weight: 700; font-size: 1.7rem; color: var(--primary); line-height: 1; }
+.gained .g .l { font-size: .78rem; color: var(--muted); margin-top: 4px; }
+.new-badges { margin: 14px 0; font-size: .85rem; }
+
+/* ===== 実スライド(デッキ)ビューア ===== */
+.player.deck { max-width: 1000px; user-select: none; -webkit-user-select: none; }
+.player.deck .slide.deck-slide { padding: 0; min-height: 0; overflow: hidden; }
+.deck-stage { position: relative; background: #14121b; border-radius: 10px; }
+.deck-stage canvas { display: block; width: 100%; height: auto; pointer-events: none; }
+.deck-cover {
+  position: absolute; inset: 0; z-index: 5;
+  display: none; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; text-align: center; padding: 24px;
+  background: #14121b; color: #fff; cursor: pointer; border-radius: 10px;
+}
+.deck-cover.show { display: flex; }
+.deck-cover .ic { font-size: 2rem; }
+.deck-cover .m { font-size: .9rem; font-weight: 600; }
+.deck-cover .s { font-size: .76rem; color: rgba(255,255,255,.65); }
+.deck-notice { font-size: .72rem; color: var(--faint); text-align: center; margin-top: 10px; }
+.deck-progress { flex: 1; min-width: 120px; height: 5px; border-radius: 3px; background: #efeaf9; overflow: hidden; }
+.deck-progress i { display: block; height: 100%; background: var(--primary); border-radius: 3px; }
+.deck-loading { display: flex; align-items: center; justify-content: center; min-height: 320px; color: var(--muted); font-size: .9rem; }
+
+/* 印刷対策: プレイヤーごと非表示にし、警告文のみ出す */
+#print-guard { display: none; }
+@media print {
+  body.deck-mode .frame-container, body.deck-mode .layout-background { display: none !important; }
+  body.deck-mode #print-guard { display: block; padding: 40px; font-size: 14pt; }
+}
+</style>
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+    <div id="lesson-root" style="margin-top:16px"></div>
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+<div id="print-guard">この教材は ASE-Lab. 会員限定です。印刷・複製・無断転載はできません。</div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "courses", title: "レッスン" });
+
+const params = new URLSearchParams(location.search);
+const courseId = params.get("id");
+const course = COURSES.find(c => c.id === courseId);
+if (!course) {
+  location.href = "courses.html";
+}
+
+/* デッキ(実スライド)コースでは、ステップ列 = [スライド頁 × deckPages, クイズ × slides.length] */
+const isDeck = !!(course && course.deck);
+const deckPages = isDeck ? course.deckPages : 0;
+const totalSteps = course ? deckPages + course.slides.length : 0;
+
+if (user && course) {
+  const p = user.progress[course.id];
+  if (!p || p.done.length !== totalSteps) {
+    user.progress[course.id] = { done: Array.from({ length: totalSteps }, () => false), quiz: {}, completed: false };
+    Store.save(user);
+  }
+}
+
+/* ===== デッキデータのロードと復号 ===== */
+let deckData = null;
+
+function loadDeck(id) {
+  return new Promise((resolve, reject) => {
+    if (window.SLIDE_DECKS && window.SLIDE_DECKS[id]) return resolve(window.SLIDE_DECKS[id]);
+    const s = document.createElement("script");
+    s.src = "assets/slides/deck-" + encodeURIComponent(id) + ".js";
+    s.onload = () => (window.SLIDE_DECKS && window.SLIDE_DECKS[id]) ? resolve(window.SLIDE_DECKS[id]) : reject(new Error("deck payload not found"));
+    s.onerror = () => reject(new Error("deck script load failed"));
+    document.head.appendChild(s);
+  });
+}
+
+/* tools/build-slides.py の XOR_KEY と一致させること */
+const DECK_KEY = [0x5A, 0x33, 0xC7, 0x18, 0x9E, 0x4B, 0xD2, 0x6F, 0x81, 0x2C, 0xF5, 0x07];
+
+async function decodeDeckPage(deck, i) {
+  const raw = atob(deck.pages[i]);
+  const bytes = new Uint8Array(raw.length);
+  for (let k = 0; k < raw.length; k++) bytes[k] = raw.charCodeAt(k) ^ DECK_KEY[k % DECK_KEY.length];
+  const blob = new Blob([bytes], { type: "image/jpeg" });
+  return createImageBitmap(blob);
+}
+
+/* ウォーターマーク: 閲覧者名+日時をピクセルに焼き込む(追跡可能性の担保) */
+function drawWatermark(ctx, w, h) {
+  const who = user ? `${user.name} ${user.handle}` : "Guest";
+  const d = new Date();
+  const z = n => String(n).padStart(2, "0");
+  const stamp = `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())} ${z(d.getHours())}:${z(d.getMinutes())}`;
+  const text = `${who} · ${stamp} · ASE-Lab. 会員限定`;
+  ctx.save();
+  ctx.font = "600 22px 'Noto Sans JP', sans-serif";
+  ctx.translate(w / 2, h / 2);
+  ctx.rotate(-Math.PI / 7);
+  const tw = ctx.measureText(text).width + 140;
+  for (let y = -h; y < h; y += 150) {
+    for (let x = -w; x < w; x += tw) {
+      ctx.fillStyle = "rgba(0,0,0,.06)";
+      ctx.fillText(text, x + 1, y + 1);
+      ctx.fillStyle = "rgba(255,255,255,.10)";
+      ctx.fillText(text, x, y);
+    }
+  }
+  ctx.restore();
+}
+
+async function paintDeckPage(i) {
+  const canvas = document.getElementById("deck-canvas");
+  if (!canvas || !deckData) return;
+  const bmp = await decodeDeckPage(deckData, i);
+  canvas.width = deckData.w;
+  canvas.height = deckData.h;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(bmp, 0, 0);
+  bmp.close();
+  drawWatermark(ctx, deckData.w, deckData.h);
+}
+
+/* ===== 保護レイヤ(抑止。DevTools・OSスクショ・撮影は原理的に防げない) ===== */
+let coverLocked = false;
+
+function showCover(msg, sub, autoHideMs) {
+  const cover = document.getElementById("deck-cover");
+  if (!cover) return;
+  cover.querySelector(".m").textContent = msg;
+  cover.querySelector(".s").textContent = sub || "クリックすると再開します";
+  cover.classList.add("show");
+  const canvas = document.getElementById("deck-canvas");
+  if (canvas) canvas.getContext("2d").clearRect(0, 0, canvas.width, canvas.height);
+  if (autoHideMs) {
+    setTimeout(() => { if (!coverLocked) hideCover(); }, autoHideMs);
+  } else {
+    coverLocked = true;
+  }
+}
+
+function hideCover() {
+  const cover = document.getElementById("deck-cover");
+  if (!cover) return;
+  coverLocked = false;
+  cover.classList.remove("show");
+  if (lesson && lesson.idx < deckPages) paintDeckPage(lesson.idx);
+}
+
+function installProtection() {
+  document.body.classList.add("deck-mode");
+  ["contextmenu", "dragstart", "selectstart", "copy"].forEach(ev =>
+    document.addEventListener(ev, e => e.preventDefault()));
+  document.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && ["s", "S", "p", "P"].includes(e.key)) {
+      e.preventDefault();
+      toast("この教材では保存・印刷は無効です");
+    }
+  });
+  document.addEventListener("keyup", e => {
+    if (e.key === "PrintScreen") {
+      showCover("スクリーンショットは禁止されています", "本教材の無断複製・転載はご遠慮ください", 1600);
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText("").catch(() => {});
+    }
+  });
+  window.addEventListener("blur", () => {
+    if (lesson && lesson.idx < deckPages) showCover("画面がバックグラウンドになったため表示を停止しました");
+  });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden && lesson && lesson.idx < deckPages) showCover("画面がバックグラウンドになったため表示を停止しました");
+  });
+}
+
+/* ===== レッスン進行 ===== */
+let lesson = null; // { course, idx, answered:{}, gained, badgesBefore }
+function initLesson() {
+  let startIdx = 0;
+  if (user) {
+    const p = user.progress[course.id];
+    const firstUndone = p.done.findIndex(d => !d);
+    startIdx = p.completed ? 0 : (firstUndone === -1 ? 0 : firstUndone);
+  }
+  lesson = { course, idx: startIdx, answered: {}, gained: 0, badgesBefore: user ? user.badges.length : 0 };
+  renderSlide();
+}
+
+function markSlideDone(i) {
+  if (!user) return;
+  const p = user.progress[course.id];
+  if (!p.done[i]) {
+    p.done[i] = true;
+    addScore(SCORE_SLIDE); lesson.gained += SCORE_SLIDE;
+    grantBadge("first-slide");
+    Store.save(user);
+  }
+}
+
+/* ステップ i の中身: デッキ頁 or クイズ等のスライド */
+function stepSlide(i) {
+  if (isDeck) return i < deckPages ? { type: "deckpage", page: i } : course.slides[i - deckPages];
+  return course.slides[i];
+}
+
+function progressHTML(i, total) {
+  if (total > 12) {
+    const pct = Math.round(((i + 1) / total) * 100);
+    return `<div class="deck-progress"><i style="width:${pct}%"></i></div>`;
+  }
+  const dots = Array.from({ length: total }, (_, k) => `<i class="${k < i ? "done" : k === i ? "cur" : ""}"></i>`).join("");
+  return `<div class="dots">${dots}</div>`;
+}
+
+function renderSlide() {
+  const c = lesson.course, i = lesson.idx;
+  const total = totalSteps;
+  if (i >= total) { renderDone(); return; }
+  const s = stepSlide(i);
+  if (s.type !== "quiz") markSlideDone(i);
+
+  let inner = "";
+  if (s.type === "deckpage") {
+    inner = `
+      <div class="deck-stage">
+        <canvas id="deck-canvas"></canvas>
+        <div class="deck-cover" id="deck-cover" onclick="hideCover()">
+          <div class="ic">🔒</div><div class="m"></div><div class="s"></div>
+        </div>
+      </div>`;
+  } else if (s.type === "quiz") {
+    const ans = lesson.answered[i];
+    inner = `
+      <div class="stype">Quiz — 確認問題</div>
+      <h2>${esc(s.question)}</h2>
+      <div class="choices" id="choices">
+        ${s.choices.map((ch, k) => {
+          let cls = "";
+          if (ans !== undefined) {
+            if (k === s.answerIndex) cls = "correct";
+            else if (k === ans && ans !== s.answerIndex) cls = "wrong";
+          }
+          return `<button class="choice ${cls}" data-k="${k}" ${ans !== undefined ? "disabled" : ""}>
+            <span class="key">${"ABCD"[k]}</span><span>${esc(ch)}</span></button>`;
+        }).join("")}
+      </div>
+      ${ans !== undefined ? `<div class="explain">
+        <b class="${ans === s.answerIndex ? "ok" : "miss"}">${ans === s.answerIndex ? "正解！" : "残念、正解は " + "ABCD"[s.answerIndex] + " です。"}</b> ${esc(s.explanation)}</div>` : ""}
+    `;
+  } else {
+    const paras = String(s.body || "").split(/\n\n+/).map(p => `<p>${esc(p)}</p>`).join("");
+    inner = `
+      <div class="stype">${s.type === "intro" ? "Introduction — このレッスンについて" : "Slide " + (i + 1) + " / " + total}</div>
+      <h2>${esc(s.title)}</h2>
+      <div class="body-text">${paras}</div>
+      ${s.formula ? `<div class="formula">${esc(s.formula)}</div>` : ""}
+      ${s.keyPoints && s.keyPoints.length ? `<div class="key-points"><div class="kt">Key points</div>
+        <ul>${s.keyPoints.map(k => `<li>${esc(k)}</li>`).join("")}</ul></div>` : ""}
+    `;
+  }
+  const answered = s.type !== "quiz" || lesson.answered[i] !== undefined;
+  const lessonTitle = isDeck ? (c.deckTitle || c.sampleLessonTitle) : c.sampleLessonTitle;
+  document.getElementById("lesson-root").innerHTML = `
+  <div class="player ${isDeck ? "deck" : ""}">
+    <div class="topbar">
+      <a class="border-button sm" href="course.html?id=${encodeURIComponent(c.id)}">✕ 終了</a>
+      <div class="t">${esc(c.icon)} ${esc(c.title)} <span style="color:var(--faint);font-weight:400">/ ${esc(lessonTitle)}</span></div>
+      ${progressHTML(i, total)}
+      <span style="font-size:.8rem;color:var(--faint)">${i + 1}/${total}</span>
+    </div>
+    <div class="slide ${s.type === "deckpage" ? "deck-slide" : ""}">${inner}</div>
+    <div class="navrow">
+      <button class="border-button sm" id="prev" ${i === 0 ? "disabled" : ""}>← 前へ</button>
+      <button class="border-button sm primary" id="next" ${answered ? "" : "disabled"}>${i === total - 1 ? "レッスンを完了する" : "次へ →"}</button>
+    </div>
+    ${isDeck ? `<div class="deck-notice">🔒 本教材は ASE-Lab. 会員限定です。無断転載・複製・撮影(スクリーンショットを含む)を禁じます。</div>` : ""}
+  </div>`;
+
+  document.getElementById("prev").onclick = () => { if (lesson.idx > 0) { lesson.idx--; renderSlide(); } };
+  document.getElementById("next").onclick = () => { lesson.idx++; renderSlide(); };
+
+  if (s.type === "deckpage") {
+    coverLocked = false;
+    paintDeckPage(s.page);
+  }
+
+  const ch = document.getElementById("choices");
+  if (ch && lesson.answered[i] === undefined) {
+    ch.addEventListener("click", e => {
+      const b = e.target.closest("[data-k]");
+      if (!b) return;
+      const k = +b.dataset.k;
+      lesson.answered[i] = k;
+      if (user) {
+        const p = user.progress[c.id];
+        if (!p.done[i]) {
+          p.done[i] = true;
+          const first = k === s.answerIndex;
+          const pts = first ? SCORE_QUIZ : SCORE_QUIZ_RETRY;
+          addScore(pts); lesson.gained += pts;
+          if (first) grantBadge("quiz-first");
+          Store.save(user);
+        }
+      }
+      renderSlide();
+    });
+  }
+}
+
+function renderDone() {
+  const c = lesson.course;
+  let bonusHtml = "";
+  if (user) {
+    const p = user.progress[c.id];
+    if (!p.completed) {
+      p.completed = true;
+      addScore(SCORE_LESSON); lesson.gained += SCORE_LESSON;
+      grantBadge("first-lesson");
+      Store.save(user);
+    }
+    const newBadges = user.badges.slice(lesson.badgesBefore).map(id => BADGES.find(b => b.id === id)).filter(Boolean);
+    bonusHtml = `
+      <div class="gained">
+        <div class="g"><div class="n">+${lesson.gained}</div><div class="l">獲得SCORE</div></div>
+        <div class="g"><div class="n">${streakWeeks(user)}<small style="font-size:.8rem">週</small></div><div class="l">連続学習</div></div>
+        <div class="g"><div class="n">${user.score}</div><div class="l">合計SCORE</div></div>
+      </div>
+      ${newBadges.length ? `<div class="new-badges"><span style="color:var(--muted)">獲得バッジ:</span> ${newBadges.map(b => `<span class="chip purple">${b.icon} ${esc(b.name)}</span>`).join(" ")}</div>` : ""}`;
+  } else {
+    bonusHtml = `<p class="muted">ログインすると、SCORE・バッジ・進捗が記録されます。</p>
+      <a class="border-button sm" href="login.html">ログインして記録する</a>`;
+  }
+  const next = COURSES[(COURSES.indexOf(c) + 1) % COURSES.length];
+  document.getElementById("lesson-root").innerHTML = `
+  <div class="player"><div class="slide donebox">
+    <div class="big">🛰</div>
+    <h2>ミッション完了 — ${esc(isDeck ? (c.deckTitle || c.sampleLessonTitle) : c.sampleLessonTitle)}</h2>
+    <p class="muted">おつかれさまでした。この調子で軌道に乗りましょう。</p>
+    ${bonusHtml}
+    <div style="display:flex;gap:12px;justify-content:center;margin-top:22px;flex-wrap:wrap">
+      <a class="border-button primary" href="course.html?id=${encodeURIComponent(next.id)}">次のコースへ: ${esc(next.icon)} ${esc(next.title)}</a>
+      <a class="border-button" href="dashboard.html">ダッシュボードで進捗を見る</a>
+    </div>
+  </div></div>`;
+}
+
+if (course) {
+  if (isDeck) {
+    installProtection();
+    document.getElementById("lesson-root").innerHTML =
+      `<div class="player deck"><div class="slide deck-slide"><div class="deck-loading">教材を読み込んでいます…</div></div></div>`;
+    loadDeck(course.deck)
+      .then(d => { deckData = d; initLesson(); })
+      .catch(() => {
+        document.getElementById("lesson-root").innerHTML =
+          `<div class="player"><div class="slide donebox">
+            <div class="big">🛰</div><h2>教材データが見つかりません</h2>
+            <p class="muted">assets/slides/ のスライドデータが未生成です。<code>python3 tools/build-slides.py</code> を実行してください。</p>
+            <a class="border-button" href="course.html?id=${encodeURIComponent(course.id)}">コースへ戻る</a>
+          </div></div>`;
+      });
+  } else {
+    initLesson();
+  }
+}
+</script>
+</body>
+</html>

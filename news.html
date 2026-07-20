@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>お知らせ | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="page-head">
+      <h1>お知らせ</h1>
+      <p>Campus の更新情報一覧です。新着はヘッダーの🔔からも確認できます。</p>
+    </div>
+
+    <div class="news-list-card" id="list"></div>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "news", title: "お知らせ" });
+
+/* 直近14日以内の記事には NEW バッジ */
+const NEW_DAYS = 14;
+function isNew(dateStr) {
+  return (Date.now() - new Date(dateStr).getTime()) / 86400000 <= NEW_DAYS;
+}
+document.getElementById("list").innerHTML = NEWS_ITEMS.map(n => `
+  <div class="news-item" data-news>
+    <span class="ni-date">${esc(n.date.replace(/-/g, "."))}</span>
+    <span class="n-tag" style="background:${NEWS_TAG_COLOR[n.tag]};font-size:.7rem;font-weight:700;color:#fff;padding:2px 10px;border-radius:999px;white-space:nowrap">${esc(n.tag)}</span>
+    <span class="ni-title">${esc(n.title)}</span>
+    ${isNew(n.date) ? '<span class="ni-new">NEW</span>' : ""}
+  </div>`).join("");
+
+document.getElementById("list").addEventListener("click", e => {
+  if (e.target.closest("[data-news]")) toast("お知らせ詳細は本実装で提供予定です(モック)");
+});
+</script>
+</body>
+</html>

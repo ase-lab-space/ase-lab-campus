@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ランキング | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.table-scroll { overflow-x: auto; }
+.table-scroll table { min-width: 760px; }
+.m-avatar {
+  width: 34px; height: 34px; flex: none;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 0.95rem;
+}
+.member-note { font-size: 0.75rem; color: var(--faint); margin-top: 14px; }
+img.m-avatar { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+img.pd-avatar { object-fit: cover; }
+</style>
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+
+    <div class="page-head">
+      <h1>ランキング</h1>
+      <p>SCOREやゼミ履修数がお互いに見えることで、モチベーションを高め合えたら、という構想のページです。</p>
+    </div>
+
+    <div id="privacy-banner"></div>
+
+    <div class="rank-teaser" id="rank-wrap">
+    <div class="podium" id="podium"></div>
+    <div class="table-scroll">
+      <table class="member-table">
+        <thead>
+          <tr>
+            <th>RANK</th>
+            <th>メンバー</th>
+            <th>立場</th>
+            <th>履修ゼミ数</th>
+            <th>🔥</th>
+            <th>バッジ数</th>
+            <th>SCORE</th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    </div>
+    <p class="member-note">※ モックのため表示は擬似データです。掲載の有無は<a href="dashboard.html">マイページのプライバシー設定</a>から切り替えられます。</p>
+
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "members", title: "ランキング" });
+
+function buildRows() {
+  const rows = MEMBERS.map(m => ({ ...m }));
+  if (user) {
+    const idx = rows.findIndex(m => m.handle === user.handle);
+    if (user.hideFromRanking) {
+      // 掲載オプトアウト時は自分を一覧から除外する
+      if (idx >= 0) rows.splice(idx, 1);
+    } else {
+      const meRow = {
+        handle: user.handle || "@you",
+        name: user.name,
+        role: user.role,
+        score: user.score,
+        seminars: user.seminarsTaken,
+        streakWeeks: streakWeeks(user),
+        badges: user.badges.length,
+        avatar: user.avatar || null,
+        isMe: true,
+      };
+      if (idx >= 0) rows[idx] = meRow;
+      else rows.push(meRow);
+    }
+  }
+  rows.sort((a, b) => b.score - a.score);
+  return rows;
+}
+
+function memberAvatarHTML(m, cls) {
+  if (m.avatar) return `<img class="${cls}" src="${esc(m.avatar)}" alt="${esc(m.name)}">`;
+  return `<span class="${cls}">${esc(m.name.slice(0, 1))}</span>`;
+}
+
+function podiumHTML(m, i) {
+  const medal = ["🥇", "🥈", "🥉"][i];
+  return `<div class="podium-card p${i + 1} ${m.isMe ? "me" : ""}">
+    <span class="medal">${medal}</span>
+    ${memberAvatarHTML(m, "pd-avatar")}
+    <div class="pd-name">${esc(m.name)}${m.isMe ? " (あなた)" : ""}</div>
+    <div class="pd-handle">${esc(m.handle)}</div>
+    <div class="pd-score">${m.score}<small> SCORE</small></div>
+    <div class="pd-meta">ゼミ ${m.seminars} ・ バッジ ${m.badges}</div>
+  </div>`;
+}
+
+function rowHTML(m, i) {
+  const flames = flameCount(m.streakWeeks);
+  return `<tr class="${m.isMe ? "me" : ""}">
+    <td class="rank">${i + 1}</td>
+    <td>
+      <div style="display:flex;align-items:center;gap:10px">
+        ${memberAvatarHTML(m, "m-avatar")}
+        <div>
+          <div class="m-name">${esc(m.name)}${m.isMe ? " (あなた)" : ""}</div>
+          <div class="m-handle">${esc(m.handle)}</div>
+        </div>
+      </div>
+    </td>
+    <td>${esc(m.role)}</td>
+    <td>${m.seminars}</td>
+    <td>${flames ? "🔥".repeat(flames) : "—"}</td>
+    <td>${m.badges}</td>
+    <td class="m-score">${m.score}</td>
+  </tr>`;
+}
+
+function render() {
+  const banner = document.getElementById("privacy-banner");
+  if (user && user.hideFromRanking) {
+    banner.innerHTML = `<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;border-left:4px solid var(--primary)">
+      <span style="font-size:1.3rem">🔒</span>
+      <div style="flex:1;min-width:200px;font-size:.86rem">
+        あなたは<b>ランキングに掲載していません</b>。他のメンバーからあなたのSCORE・記録は見えません。
+        <div style="font-size:.74rem;color:var(--muted);margin-top:2px">掲載する場合は<a href="dashboard.html">マイページのプライバシー設定</a>から変更できます。</div>
+      </div>
+    </div>`;
+  } else {
+    banner.innerHTML = "";
+  }
+  const rows = buildRows();
+  document.getElementById("podium").innerHTML = rows.slice(0, 3).map(podiumHTML).join("");
+  document.getElementById("tbody").innerHTML = rows.slice(3).map((m, i) => rowHTML(m, i + 3)).join("");
+  // 未ログイン時はチラ見せ: 表をぼかしてログイン誘導を重ねる
+  if (!user) {
+    const wrap = document.getElementById("rank-wrap");
+    wrap.querySelector(".podium").classList.add("rank-blur");
+    wrap.querySelector(".table-scroll").classList.add("rank-blur");
+    const gate = document.createElement("div");
+    gate.className = "rank-gate";
+    gate.innerHTML = `
+      <p>ランキングは ASE-Lab. Campus のメンバー限定です</p>
+      <a class="lab-button" href="login.html" style="margin-left:0">🔒 ログインしてランキングを見る</a>`;
+    wrap.appendChild(gate);
+  }
+}
+render();
+</script>
+</body>
+</html>

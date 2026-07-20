@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>コース | ASE-Lab. Campus</title>
+<link rel="icon" href="img/logo.webp">
+<link href="https://fonts.googleapis.com/css2?family=Teko:wght@500&family=Lato:wght@400;700&family=M+PLUS+Rounded+1c:wght@500;700;800&family=Noto+Sans+JP:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/style.css">
+<style>
+.course-head { max-width: 880px; margin: 24px auto 0; padding: 30px 34px; display: block; }
+.course-head .top-row { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.course-cover { width: 300px; max-width: 100%; aspect-ratio: 16/9; object-fit: cover; border-radius: 12px; box-shadow: var(--shadow-card); flex: none; }
+@media (max-width: 900px) { .course-cover { width: 100%; order: -1; } }
+.course-head .cicon-lg {
+  width: 66px; height: 66px; border-radius: 14px;
+  background: var(--primary-soft); font-size: 2rem;
+  display: flex; align-items: center; justify-content: center; flex: none;
+}
+.course-head .en-lg { font-family: var(--font-title); font-weight: 600; font-size: .72rem; letter-spacing: 1px; color: var(--faint); text-transform: uppercase; }
+.course-head h1 { font-size: 1.6rem; margin: 4px 0 8px; }
+.course-head .meta { display: flex; gap: 8px; flex-wrap: wrap; }
+.course-body-card { max-width: 880px; margin: 16px auto 0; padding: 22px 26px; }
+.sample-list .r {
+  display: flex; gap: 10px; align-items: baseline;
+  font-size: .88rem; padding: 9px 13px;
+  border: 1px solid var(--line); border-radius: 8px; background: #fff;
+}
+.sample-list .r + .r { margin-top: 8px; }
+.sample-list .idx { font-family: var(--font-title); font-weight: 700; font-size: .8rem; color: var(--faint); flex: none; }
+.sample-list .stitle { flex: 1; }
+
+/* ===== カリキュラム(全レッスン一覧) ===== */
+.curr-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+.curr-head .sub { font-size: .78rem; color: var(--muted); }
+.lesson-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
+@media (max-width: 720px) { .lesson-grid { grid-template-columns: 1fr; } }
+.lesson-card {
+  display: flex; gap: 14px; align-items: stretch;
+  border: 1px solid var(--line); border-radius: 12px; background: #fff;
+  padding: 12px; text-decoration: none; color: inherit;
+  transition: transform .15s ease, box-shadow .15s ease;
+}
+.lesson-card.open:hover { transform: translateY(-2px); box-shadow: var(--shadow-card); border-color: var(--btn-border); }
+.lesson-card.locked { opacity: .78; }
+.lesson-thumb {
+  width: 108px; flex: none; aspect-ratio: 16/9; border-radius: 8px;
+  position: relative; overflow: hidden; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.lesson-thumb .tnum { font-family: var(--font-title); font-weight: 800; font-size: 1.9rem; letter-spacing: 1px; text-shadow: 0 1px 4px rgba(0,0,0,.35); }
+.lesson-thumb .tic { position: absolute; right: 6px; bottom: 4px; font-size: 1.05rem; opacity: .9; }
+.lesson-thumb .torbit { position: absolute; width: 150%; aspect-ratio: 1; border: 1.5px solid rgba(255,255,255,.28); border-radius: 50%; left: -40%; top: -30%; }
+.lesson-thumb .lockic { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; background: rgba(0,0,0,.28); }
+.lesson-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lesson-info .ln { font-family: var(--font-title); font-weight: 700; font-size: .68rem; letter-spacing: 1px; color: var(--primary); text-transform: uppercase; }
+.lesson-info h4 { font-size: .92rem; margin: 2px 0 3px; line-height: 1.35; }
+.lesson-info .lsum { font-size: .74rem; color: var(--muted); line-height: 1.4; }
+.lesson-info .lfoot { margin-top: auto; padding-top: 6px; }
+</style>
+</head>
+<body class="campus-theme">
+<div class="frame-container">
+  <div class="frame-container-top">
+    <div id="app-header"></div>
+    <div id="course-root"></div>
+    <div id="app-footer"></div>
+  </div>
+</div>
+<div class="layout-background"></div>
+
+<script src="assets/data.js"></script>
+<script src="assets/app.js"></script>
+<script>
+Shell.init({ page: "courses", title: "コース" });
+
+const params = new URLSearchParams(location.search);
+const courseId = params.get("id");
+const course = COURSES.find(c => c.id === courseId);
+
+/* コースカテゴリ別のサムネイル配色 */
+const CAT_GRAD = {
+  "工学基礎":       ["#2a1070", "#6d47d9"],
+  "システム設計":   ["#083a4a", "#1c7a8c"],
+  "データ利用":     ["#0c2f63", "#2f6fbd"],
+  "ビジネス・政策": ["#5a3407", "#b87317"],
+};
+
+if (!course) {
+  location.href = "courses.html";
+} else {
+  render();
+}
+
+function render() {
+  const pr = user ? courseProgress(course) : { pct: 0, started: false, completed: false };
+  const typeLabel = { intro: "導入", content: "解説", quiz: "クイズ" };
+  const ctaLabel = pr.started ? (pr.completed ? "もう一度学ぶ" : "続きから学ぶ") : "体験レッスンをはじめる";
+
+  document.getElementById("course-root").innerHTML = `
+    <div style="max-width:880px;margin:0 auto">
+      <a class="single-line-link" href="courses.html">← コース一覧</a>
+    </div>
+    <div class="card course-head">
+      <div class="top-row">
+        <div class="cicon-lg">${esc(course.icon)}</div>
+        <div style="flex:1;min-width:240px">
+          <div class="en-lg">${esc(course.titleEn)}</div>
+          <h1>${esc(course.title)}</h1>
+          <div class="meta">
+            <span class="chip purple">${esc(course.level)}</span>
+            <span class="chip outline">${esc(course.category)}</span>
+            <span class="chip outline">全${course.totalLessons}レッスン予定</span>
+            ${course.deck ? '<span class="chip green">実教材スライド</span>' : ""}
+          </div>
+        </div>
+        <img class="course-cover" src="img/covers/${encodeURIComponent(course.id)}.jpg" alt="${esc(course.title)}のカバー">
+      </div>
+      <p style="margin-top:18px">${esc(course.description)}</p>
+      <div class="key-points" style="margin-top:16px">
+        <div class="kt">Learning outcomes — このコースでできるようになること</div>
+        <ul>${course.outcomes.map(o => `<li>${esc(o)}</li>`).join("")}</ul>
+      </div>
+      ${pr.started ? `<div style="margin-top:18px">
+        <div class="progress-bar"><i style="width:${pr.pct}%"></i></div>
+        <div class="progress-meta"><span>${pr.completed ? "体験レッスン修了 🎉" : "学習中"}</span><span>${pr.pct}%</span></div>
+      </div>` : ""}
+      <div style="margin-top:24px;display:flex;gap:14px;flex-wrap:wrap;align-items:center">
+        <a class="border-button primary" href="lesson.html?id=${encodeURIComponent(course.id)}">${ctaLabel}</a>
+        ${user ? "" : '<span style="font-size:.8rem;color:var(--muted)">※ ログインすると進捗とSCOREが記録されます</span>'}
+      </div>
+    </div>
+    <div class="card course-body-card">
+      <div class="curr-head">
+        <div>
+          <div style="font-family:var(--font-title);font-weight:700;font-size:.72rem;letter-spacing:1px;color:var(--primary);text-transform:uppercase">Curriculum</div>
+          <h3 style="font-size:1.05rem;margin:4px 0 0">カリキュラム — 全${course.lessons.length}回</h3>
+        </div>
+        <span class="sub">🔓 Lesson 1 を公開中 ・ 以降のレッスンは順次公開予定</span>
+      </div>
+      <div class="lesson-grid">
+        ${course.lessons.map(lessonCardHTML).join("")}
+      </div>
+    </div>
+
+    <div class="card course-body-card">
+      <div style="font-family:var(--font-title);font-weight:700;font-size:.72rem;letter-spacing:1px;color:var(--primary);text-transform:uppercase">Lesson 1 の構成</div>
+      <h3 style="font-size:1.05rem;margin:6px 0 14px">${esc(course.sampleLessonTitle)}</h3>
+      <div class="sample-list">
+        ${course.deck ? `<div class="r">
+          <span class="idx">01</span>
+          <span class="stitle">${esc(course.deckTitle || course.sampleLessonTitle)}（全${course.deckPages}頁）🔒 会員限定・複製不可</span>
+          <span class="chip outline">スライド</span>
+        </div>` : ""}
+        ${course.slides.map((s, i) => `<div class="r">
+          <span class="idx">${String(i + 1 + (course.deck ? 1 : 0)).padStart(2, "0")}</span>
+          <span class="stitle">${esc(s.title || s.question)}</span>
+          <span class="chip ${s.type === "quiz" ? "blue" : "outline"}">${typeLabel[s.type]}</span>
+        </div>`).join("")}
+      </div>
+    </div>`;
+}
+
+function lessonThumbHTML(l) {
+  const [c1, c2] = CAT_GRAD[course.category] || ["#37474f", "#78909c"];
+  const locked = l.status === "coming";
+  return `<div class="lesson-thumb" style="background:linear-gradient(135deg,${c1},${c2})">
+    <span class="torbit"></span>
+    <span class="tnum">${String(l.n).padStart(2, "0")}</span>
+    <span class="tic">${esc(course.icon)}</span>
+    ${locked ? '<span class="lockic">🔒</span>' : ""}
+  </div>`;
+}
+
+function lessonCardHTML(l) {
+  const open = l.status !== "coming";
+  const statusChip = l.status === "deck"
+    ? '<span class="chip green">実教材スライド</span>'
+    : l.status === "open"
+      ? '<span class="chip purple">公開中・体験可能</span>'
+      : '<span class="chip outline">近日公開</span>';
+  const inner = `
+    ${lessonThumbHTML(l)}
+    <div class="lesson-info">
+      <div class="ln">Lesson ${l.n}</div>
+      <h4>${esc(l.title)}</h4>
+      <div class="lsum">${esc(l.summary)}</div>
+      <div class="lfoot">${statusChip}</div>
+    </div>`;
+  return open
+    ? `<a class="lesson-card open" href="lesson.html?id=${encodeURIComponent(course.id)}">${inner}</a>`
+    : `<div class="lesson-card locked" title="このレッスンは近日公開予定です">${inner}</div>`;
+}
+</script>
+</body>
+</html>
