@@ -1,5 +1,10 @@
 # ASE-Lab. Campus (Reboot β)
 
+> ## ⚠ 警告: 開発期間中のみ、実スライド教材を含めて公開しています（2026-09-29〜）
+> `rocket-propulsion` / `orbital-datacenter` のスライドデータが、この Public リポジトリから
+> **誰でも直接ダウンロード可能**です。**本番リリース前に必ず削除し、Git履歴からも消してください**
+> （手順: [MAINTENANCE.md §0](MAINTENANCE.md)）。公開URLを広く拡散しないでください。
+
 ASE-Lab. 5周年プロジェクト「Reboot」の学習プラットフォーム **Campus** の共有用サイトです。
 ステークホルダー向けに GitHub Pages で公開するための、静的サイト（HTML/CSS/JS のみ・ビルド不要）です。
 
